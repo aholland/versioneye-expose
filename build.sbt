@@ -5,7 +5,7 @@ version := "1.0-SNAPSHOT"
 
 updateOptions := updateOptions.value.withCachedResolution(true)
 scalacOptions in ThisBuild ++= Seq("-unchecked", "-deprecation", "-feature")
-scalaVersion in ThisBuild := "2.12.1"
+scalaVersion in ThisBuild := "2.11.8"
 lazy val sharedJvm = shared.jvm
 lazy val sharedJs = shared.js
 
@@ -14,7 +14,7 @@ lazy val elideOptions = settingKey[Seq[String]]("Set limit for elidable function
 
 lazy val clients = Seq(client)
 
-val dbDeps = Seq("mysql" % "mysql-connector-java" % "5.1.38")
+val dbDeps = Seq("mysql" % "mysql-connector-java" % "5.1.40")
 
 val slickSharedDeps = Seq("com.typesafe.slick" %% "slick" % "3.2.0-M2")
 
@@ -23,8 +23,8 @@ val slickServerDeps = Seq(
 ) ++ slickSharedDeps ++ dbDeps
 
 val poiDeps = Seq(
- "org.apache.poi" % "poi" % "3.12",
- "org.apache.poi" % "poi-ooxml" % "3.12"
+ "org.apache.poi" % "poi" % "3.15",
+ "org.apache.poi" % "poi-ooxml" % "3.15"
 )
 
 lazy val services = (project in file("services")).settings(
@@ -39,7 +39,7 @@ lazy val server = (project in file("server")).settings(
  libraryDependencies ++= poiDeps,
  libraryDependencies ++= Seq(
   "com.vmunier" %% "play-scalajs-scripts" % "0.4.0",
-  "org.webjars" % "jquery" % "1.11.1"
+  "org.webjars" % "jquery" % "3.1.1-1"
  )
 ).enablePlugins(PlayScala)
  .aggregate(clients.map(projectToRef): _*)
@@ -62,13 +62,13 @@ lazy val client = (project in file("client")).settings(
  //TODO ElementQueries in public/scripts contains these files while I await https://github.com/marcj/css-element-queries/pull/116
  //jsDependencies += "org.webjars.bower" % "css-element-queries" % "0.3.2" / "0.3.2/src/ElementQueries.js",
  // jsDependencies += "org.webjars.bower" % "css-element-queries" % "0.3.2" / "0.3.2/src/ResizeSensor.js",
- jsDependencies += "org.webjars" % "log4javascript" % "1.4.10" / "js/log4javascript_uncompressed.js" minified "js/log4javascript.js",
+ jsDependencies += "org.webjars" % "log4javascript" % "1.4.13-1" / "js/log4javascript_uncompressed.js" minified "js/log4javascript.js",
  libraryDependencies ++= Seq(
   "org.scala-js" %%% "scalajs-dom" % "0.9.0",
   "be.doeraene" %%% "scalajs-jquery" % "0.9.1",
   "org.scala-js" %%% "scalajs-java-time" % "0.2.0",
   // test
-  "com.lihaoyi" %%% "utest" % "0.3.1" % "test"
+  "com.lihaoyi" %%% "utest" % "0.4.4" % "test"
  )
 ).enablePlugins(ScalaJSPlugin, ScalaJSPlay).
  dependsOn(sharedJs)
