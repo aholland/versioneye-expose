@@ -1,11 +1,10 @@
 import sbt.Project.projectToRef
-
 name := "Main Play Project"
 version := "1.0-SNAPSHOT"
 
 updateOptions := updateOptions.value.withCachedResolution(true)
 scalacOptions in ThisBuild ++= Seq("-unchecked", "-deprecation", "-feature")
-scalaVersion in ThisBuild := "2.11.8"
+scalaVersion in ThisBuild := "2.12.1"
 lazy val sharedJvm = shared.jvm
 lazy val sharedJs = shared.js
 
@@ -16,20 +15,21 @@ lazy val clients = Seq(client)
 
 val dbDeps = Seq("mysql" % "mysql-connector-java" % "5.1.40")
 
-val slickSharedDeps = Seq("com.typesafe.slick" %% "slick" % "3.2.0-M2")
+val slickSharedDeps = Seq("com.typesafe.slick" %% "slick" % "3.2.0")
 
 val slickServerDeps = Seq(
- "com.typesafe.play" %% "play-slick" % "1.1.1"
+ "com.typesafe.play" %% "play-slick" % "3.0.0-M3"
 ) ++ slickSharedDeps ++ dbDeps
 
 val poiDeps = Seq(
- "org.apache.poi" % "poi" % "3.15",
- "org.apache.poi" % "poi-ooxml" % "3.15"
+ "org.apache.poi" % "poi" % "3.16-beta2",
+ "org.apache.poi" % "poi-ooxml" % "3.16-beta2"
 )
 
 lazy val services = (project in file("services")).settings(
  libraryDependencies += filters
 )
+
 lazy val server = (project in file("server")).settings(
  PlayKeys.playRunHooks += HttpRequestOnStartPlayRunHook(baseDirectory.value),
  scalaJSProjects := clients,
@@ -38,17 +38,22 @@ lazy val server = (project in file("server")).settings(
  libraryDependencies ++= slickServerDeps,
  libraryDependencies ++= poiDeps,
  libraryDependencies ++= Seq(
-  "com.vmunier" %% "play-scalajs-scripts" % "0.4.0",
+  // https://mvnrepository.com/artifact/javax.xml.stream/stax-api
+  //"javax.xml.stream" % "stax-api" % "1.0-2",
+  "com.vmunier" %% "scalajs-scripts" % "1.1.0",
+//  "com.vmunier" %% "play-scalajs-scripts" % "0.4.0",
   "org.webjars" % "jquery" % "3.1.1-1"
  )
 ).enablePlugins(PlayScala)
  .aggregate(clients.map(projectToRef): _*)
- .dependsOn(services, sharedJvm, macros)
+ .dependsOn(services, sharedJvm/*, macros*/)
 
 lazy val shared = (crossProject.crossType(CrossType.Pure) in file("shared")).
  settings(
   libraryDependencies ++= (Seq(
-   "com.lihaoyi" %%% "upickle" % "0.4.4",
+   "io.circe" %%% "circe-core" % "0.7.0",
+   "io.circe" %%% "circe-generic" % "0.7.0",
+   "io.circe" %%% "circe-parser" % "0.7.0",
    "com.lihaoyi" %%% "autowire" % "0.2.6",
    "com.lihaoyi" %%% "scalatags" % "0.6.2"
   ) ++ slickSharedDeps)
@@ -73,10 +78,12 @@ lazy val client = (project in file("client")).settings(
 ).enablePlugins(ScalaJSPlugin, ScalaJSPlay).
  dependsOn(sharedJs)
 
+//TODO Macros / Makroz
+/*
 lazy val macros = (project in file("macros")).settings(
  libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
 ).dependsOn(services)
-
+*/
 onLoad in Global := (Command.process("project server", _: State)) compose (onLoad in Global).value
 
 // See https://github.com/ochrons/scalajs-spa-tutorial/blob/master/build.sbt for release
