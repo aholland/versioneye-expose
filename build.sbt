@@ -1,124 +1,96 @@
-import java.io.IOException
-import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file._
-enablePlugins(ScalaJSPlugin, WorkbenchPlugin/*,ScalaJSBundlerPlugin*/)
+import sbt.Project.projectToRef
+import sbt.Project.projectToRef
+name := "Main Play Project"
+version := "1.0-SNAPSHOT"
 
-//resolvers += Resolver.file("releases", file("C:/Workspace/Data/.m2/repository"))
+updateOptions := updateOptions.value.withCachedResolution(true)
+scalacOptions in ThisBuild ++= Seq("-unchecked", "-deprecation", "-feature")
+scalaVersion in ThisBuild := "2.12.1"
 
-name := "Client Dev"
+lazy val sharedJvm = shared.jvm
+lazy val sharedJs = shared.js
 
-version := "0.1-SNAPSHOT"
-
-scalaVersion := "2.12.1"
-
-libraryDependencies ++= Seq(
- //shared
- "io.circe" %%% "circe-core" % "0.8.0",
- "io.circe" %%% "circe-generic" % "0.8.0",
- "io.circe" %%% "circe-parser" % "0.8.0",
- "com.lihaoyi" %%% "autowire" % "0.2.6",
- "com.lihaoyi" %%% "scalatags" % "0.6.5",
- "com.typesafe.slick" %% "slick" % "3.2.0",
- //client
- "org.scala-js" %%% "scalajs-dom" % "0.9.2-SNAPSHOT",
- "be.doeraene" %%% "scalajs-jquery" % "0.9.1",
- "org.scala-js" %%% "scalajs-java-time" % "0.2.1",
- // client test
- "com.lihaoyi" %%% "utest" % "0.4.4" % "test"
-)
-
-jsDependencies += RuntimeDOM
-
-
-scalaJSUseMainModuleInitializer := true
-//npmDependencies in Compile += "sourcemapped-stacktrace" -> "1.1.6"
-mainClass in Compile := Some("vintur.Main")
-//mainClass in Compile := Some("ezilay.EziTest")
-scalaJSUseMainModuleInitializer in Test := false
-
-
-testFrameworks += new TestFramework("utest.runner.Framework")
+// use eliding to drop some debug code in the production build
 lazy val elideOptions = settingKey[Seq[String]]("Set limit for elidable functions")
 
-elideOptions := Seq()
+lazy val clients = Seq(client)
 
-scalacOptions ++= elideOptions.value
+val dbDeps = Seq("mysql" % "mysql-connector-java" % "6.0.6")
 
-skip in packageJSDependencies := false
+val slickSharedDeps = Seq("com.typesafe.slick" %% "slick" % "3.2.0")
 
-//TODO ElementQueries in public/scripts contains these files while I await https://github.com/marcj/css-element-queries/pull/116
-//jsDependencies += "org.webjars.bower" % "css-element-queries" % "0.3.2" / "0.3.2/src/ElementQueries.js"
-//jsDependencies += "org.webjars.bower" % "css-element-queries" % "0.3.2" / "0.3.2/src/ResizeSensor.js"
-jsDependencies += "org.webjars" % "log4javascript" % "1.4.13-1" / "js/log4javascript_uncompressed.js" minified "js/log4javascript.js"
-//jsDependencies += "org.webjars" % "jquery" % "2.1.3" / "2.1.3/jquery.js"
-jsDependencies += "org.webjars" % "jquery" % "3.2.1" / "3.2.1/jquery.js"
-//scalaJSOptimizerOptions ~= {_.withDisableOptimizer(true)}
+val slickServerDeps = Seq(
+ "com.typesafe.play" %% "play-slick" % "3.0.0"
+) ++ slickSharedDeps ++ dbDeps
 
-lazy val copyOver = TaskKey[Unit]("copyOver")
+val poiDeps = Seq(
+ "org.apache.poi" % "poi" % "3.16",
+ "org.apache.poi" % "poi-ooxml" % "3.16"
+)
 
-copyOver := {
- println("Started copyOver")
- val wbRoot: File = baseDirectory.value
- val vinturRoot = new File(wbRoot, "\\..").getCanonicalFile
- val playRoot = new File(vinturRoot, "\\play").getCanonicalFile
- val wbStylesheetsDir = new File(wbRoot, "\\src\\main\\resources\\stylesheets").getCanonicalFile
- val wbShared = new File(wbRoot, "\\src\\main\\scala\\shared").getCanonicalFile
- val wbClient = new File(wbRoot, "\\src\\main\\scala").getCanonicalFile
- val playStylesheetsDir = new File(playRoot, "\\server\\public\\stylesheets").getCanonicalFile
- val playShared = new File(playRoot, "\\shared\\\\src\\main\\scala\\shared").getCanonicalFile
- val playClient = new File(playRoot, "\\client\\src\\main\\scala").getCanonicalFile
- println("vinturRoot = " + vinturRoot.toPath)
- println("wbRoot = " + wbRoot.toPath)
- println("playRoot = " + playRoot.toPath)
- println("wbStylesheetsDir = " + wbStylesheetsDir.toPath)
- println("playStylesheetsDir = " + playStylesheetsDir.toPath)
- println("reltest: " + vinturRoot.toPath.relativize(wbStylesheetsDir.toPath))
- //TODO put these visitors in a public library
- class DeleteContentsVisitor(root: Path) extends java.nio.file.SimpleFileVisitor[Path] {
-  private def delete(path: Path): Unit = if (!path.toFile.delete()) throw new IOException("Could not delete file \"" + path + "\"")
-  override def visitFile(filePath: Path, attrs: BasicFileAttributes): FileVisitResult = {
-   delete(filePath)
-   java.nio.file.FileVisitResult.CONTINUE
-  }
-  override def postVisitDirectory(dirPath: Path, exc: IOException): FileVisitResult = {
-   if (dirPath != root) {
-    delete(dirPath)
-   }
-   java.nio.file.FileVisitResult.CONTINUE
-  }
- }
- class ClearAndCopyVisitor(srcRoot: File, destRoot: File, opSkipDir: Option[Path]) extends java.nio.file.SimpleFileVisitor[Path] {
-  private val srcRootPath = srcRoot.toPath
-  private def toTarget(srcPath: Path): Path = {
-   println("srcRootPath=" + srcRootPath)
-   println("srcPath=" + srcPath)
-   val rel = srcRootPath.relativize(srcPath).normalize().toString
-   println("rel=" + rel)
-   new File(destRoot, rel).getAbsoluteFile.toPath
-  }
-  override def preVisitDirectory(dirPath: Path, attrs: BasicFileAttributes): FileVisitResult = {
-   if (opSkipDir.exists(_ == dirPath)) {
-    java.nio.file.FileVisitResult.SKIP_SUBTREE
-   } else {
-    val dest = toTarget(dirPath)
-    if (dirPath == srcRootPath) {
-     Files.walkFileTree(dest, new DeleteContentsVisitor(dest))
-    } else {
-     println("dirPath=" + dirPath)
-     println("dest=" + dest)
-     Files.copy(dirPath, dest)
-    }
-    java.nio.file.FileVisitResult.CONTINUE
-   }
-  }
-  override def visitFile(filePath: Path, attrs: BasicFileAttributes): FileVisitResult = {
-   Files.copy(filePath, toTarget(filePath))
-   java.nio.file.FileVisitResult.CONTINUE
-  }
- }
- def copyOver(sourceDir: File, targetDir: File, opSkipDir: Option[File] = None) = Files.walkFileTree(sourceDir.toPath, new ClearAndCopyVisitor(sourceDir, targetDir, opSkipDir.map(_.toPath)))
- copyOver(wbStylesheetsDir, playStylesheetsDir)
- copyOver(wbShared, playShared)
- copyOver(wbClient, playClient, Some(wbShared))
- println("Completed copyOver")
-}
+lazy val services = (project in file("services")).settings(
+ libraryDependencies += filters,
+ libraryDependencies += guice
+)
+
+lazy val server = (project in file("server")).settings(
+ //PlayKeys.playRunHooks += HttpRequestOnStartPlayRunHook(baseDirectory.value),
+ scalaJSProjects := clients,
+ pipelineStages := Seq(scalaJSProd, gzip),
+ libraryDependencies += guice,
+ libraryDependencies ++= dbDeps,
+ libraryDependencies ++= slickServerDeps,
+ libraryDependencies ++= poiDeps,
+ libraryDependencies ++= Seq(
+  // https://mvnrepository.com/artifact/javax.xml.stream/stax-api
+  //"javax.xml.stream" % "stax-api" % "1.0-2",
+  "com.vmunier" %% "scalajs-scripts" % "1.1.0",
+  //  "com.vmunier" %% "play-scalajs-scripts" % "0.4.0",
+  "org.webjars" % "jquery" % "3.2.1"
+ )
+).enablePlugins(PlayScala)
+ .aggregate(clients.map(projectToRef): _*)
+ .dependsOn(services, sharedJvm /*, macros*/)
+
+lazy val shared = (crossProject.crossType(CrossType.Pure) in file("shared")).
+ settings(
+  libraryDependencies ++= (Seq(
+   "io.circe" %%% "circe-core" % "0.8.0",
+   "io.circe" %%% "circe-generic" % "0.8.0",
+   "io.circe" %%% "circe-parser" % "0.8.0",
+   "com.lihaoyi" %%% "autowire" % "0.2.6",
+   "com.lihaoyi" %%% "scalatags" % "0.6.5"
+  ) ++ slickSharedDeps)
+ ).jsConfigure(_ enablePlugins ScalaJSPlay)
+
+lazy val client = (project in file("client")).settings(
+ mainClass in Compile := Some("vintur.Main"),
+ scalaJSUseMainModuleInitializer := true,
+ scalaJSUseMainModuleInitializer in Test := false,
+ elideOptions := Seq(),
+ scalacOptions ++= elideOptions.value,
+ skip in packageJSDependencies := false,
+ //TODO ElementQueries in public/scripts contains these files while I await https://github.com/marcj/css-element-queries/pull/116
+ jsDependencies += "org.webjars" % "log4javascript" % "1.4.13-1" / "js/log4javascript_uncompressed.js" minified "js/log4javascript.js",
+ jsDependencies += "org.webjars" % "jquery" % "2.1.3" / "2.1.3/jquery.js",
+ libraryDependencies ++= Seq(
+  "org.scala-js" %%% "scalajs-dom" % "0.9.2-SNAPSHOT",
+  "be.doeraene" %%% "scalajs-jquery" % "0.9.1",
+  "org.scala-js" %%% "scalajs-java-time" % "0.2.1",
+  // test
+  "com.lihaoyi" %%% "utest" % "0.4.7" % "test"
+ )
+ //jsDependencies += "org.webjars.bower" % "css-element-queries" % "0.3.2" / "0.3.2/src/ElementQueries.js",
+ // jsDependencies += "org.webjars.bower" % "css-element-queries" % "0.3.2" / "0.3.2/src/ResizeSensor.js",
+).enablePlugins(ScalaJSPlugin, ScalaJSPlay).
+ dependsOn(sharedJs)
+
+//TODO Macros / Makroz
+/*
+lazy val macros = (project in file("macros")).settings(
+ libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
+).dependsOn(services)
+*/
+onLoad in Global := (Command.process("project server", _: State)) compose (onLoad in Global).value
+
+// See https://github.com/ochrons/scalajs-spa-tutorial/blob/master/build.sbt for release
