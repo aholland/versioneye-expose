@@ -24,8 +24,8 @@ val slickServerDeps = Seq(
 ) ++ slickSharedDeps ++ dbDeps
 
 val poiDeps = Seq(
- "org.apache.poi" % "poi" % "3.16",
- "org.apache.poi" % "poi-ooxml" % "3.16"
+ "org.apache.poi" % "poi" % "3.17",
+ "org.apache.poi" % "poi-ooxml" % "3.17"
 )
 
 lazy val services = (project in file("services")).settings(
